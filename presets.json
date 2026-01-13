@@ -1,0 +1,112 @@
+{
+  "Blue - Yung Kai": {
+    "midi_relpath": "midis/blue - yung kai (simple).mid",
+    "base_c_midi": 48,
+    "transpose": 0,
+    "speed": 1.0,
+    "lead_in": 2.0,
+    "trim_silence": true,
+    "tap_mode": true,
+    "tap_ms": 18
+  },
+  "Senbonzakura - Miku": {
+    "midi_relpath": "midis/Hatsune Miku - Senbonzakura.mid",
+    "base_c_midi": 48,
+    "transpose": 0,
+    "speed": 1.0,
+    "lead_in": 2.0,
+    "trim_silence": true,
+    "tap_mode": false,
+    "tap_ms": 18
+  },
+  "Golden Hour - JVKE": {
+    "midi_relpath": "midis/JVKE - golden hour-4.mid",
+    "base_c_midi": 58,
+    "transpose": 0,
+    "speed": 0.65,
+    "lead_in": 2.0,
+    "trim_silence": true,
+    "tap_mode": true,
+    "tap_ms": 18
+  },
+  "Let It Go - Frozen": {
+    "midi_relpath": "midis/frozen-let-it-go.mid-3.mid",
+    "base_c_midi": 46,
+    "transpose": 0,
+    "speed": 0.95,
+    "lead_in": 2.0,
+    "trim_silence": true,
+    "tap_mode": true,
+    "tap_ms": 18
+  },
+  "The Door - Teddy Swims": {
+    "midi_relpath": "midis/Teddy Swims - The Door-2.mid",
+    "base_c_midi": 42,
+    "transpose": 0,
+    "speed": 1.7,
+    "lead_in": 2.0,
+    "trim_silence": true,
+    "tap_mode": true,
+    "tap_ms": 18
+  },
+  "Love Me Net - Ravyn Lenae": {
+    "midi_relpath": "midis/Ravyn Lenae - Love Me Not.mid",
+    "base_c_midi": 50,
+    "transpose": 0,
+    "speed": 0.9,
+    "lead_in": 2.0,
+    "trim_silence": true,
+    "tap_mode": true,
+    "tap_ms": 18
+  },
+  "Shape of You - Ed": {
+    "midi_relpath": "midis/Ed Sheeran - Shape of You.mid",
+    "base_c_midi": 54,
+    "transpose": 0,
+    "speed": 0.75,
+    "lead_in": 2.0,
+    "trim_silence": true,
+    "tap_mode": true,
+    "tap_ms": 18
+  },
+  "Wedding March": {
+    "midi_relpath": "midis/piano wedding march.mid.mid",
+    "base_c_midi": 48,
+    "transpose": 0,
+    "speed": 0.75,
+    "lead_in": 2.0,
+    "trim_silence": true,
+    "tap_mode": true,
+    "tap_ms": 18
+  },
+  "Happy Birthday": {
+    "midi_relpath": "midis/Happy Birthday MIDI.mid",
+    "base_c_midi": 48,
+    "transpose": 0,
+    "speed": 0.75,
+    "lead_in": 2.0,
+    "trim_silence": true,
+    "tap_mode": true,
+    "tap_ms": 18
+  },
+  "Blue Bird - Naruto": {
+    "midi_relpath": "midis/Naruto Shippuden - Blue Bird-2.mid",
+    "base_c_midi": 48,
+    "transpose": 0,
+    "speed": 0.75,
+    "lead_in": 2.0,
+    "trim_silence": true,
+    "tap_mode": true,
+    "tap_ms": 18
+  },
+  "Gurenge - Demon Slayer": {
+    "midi_relpath": "midis/Demon Slayer - Kimetsu no Yaiba OP - Gurenge Band MIDI Cover.mid.mid",
+    "base_c_midi": 54,
+    "transpose": 0,
+    "speed": 0.9,
+    "lead_in": 2.0,
+    "trim_silence": true,
+    "tap_mode": false,
+    "tap_ms": 18
+  }
+}
