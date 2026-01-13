@@ -108,5 +108,16 @@
     "trim_silence": true,
     "tap_mode": false,
     "tap_ms": 18
+  },
+  "Homura - Lisa": {
+    "midi_relpath": "midis\\Homura-\u708e-Lisa.mid (1).mid",
+    "base_c_midi": 48,
+    "transpose": 0,
+    "speed": 1.0,
+    "lead_in": 2.0,
+    "trim_silence": true,
+    "tap_mode": true,
+    "tap_ms": 18,
+    "use_windows_map": true
   }
 }

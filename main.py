@@ -13,69 +13,69 @@ from tkinter import ttk
 import mido
 from pynput.keyboard import Controller
 
-# Optional DirectInput backend for games that ignore normal key events on Windows.
-# pydirectinput uses DirectInput scan codes / SendInput and can work when PyAutoGUI-style inputs don't. :contentReference[oaicite:4]{index=4}
-try:
-    import pydirectinput  # type: ignore
-    HAS_PYDIRECTINPUT = True
-except Exception:
-    pydirectinput = None
-    HAS_PYDIRECTINPUT = False
-
-
 kb = Controller()
-
-# ===========================
-# Windows keymap (your image)
-# ===========================
-# White keys are 1..7; black keys are 2,3,5,6,7 (no black between 3 and 4).
-#
-# TOP OCTAVE (has extra high C at the end):
-#   C  C#  D  D#  E  F  F#  G  G#  A  A#  B   C
-#   Q   2  W   3  E  R   5  T   6  Y   7  U   I
-#
-# MID OCTAVE:
-#   C  C#  D  D#  E  F  F#  G  G#  A  A#  B
-#   Z   S  X   D  C  V   G  B   H  N   J  M
-#
-# LOW OCTAVE:
-#   C  C#  D  D#  E  F  F#  G  G#  A  A#  B
-#   L   .  ;   '  /  O   0  P   -  [   =  ]
-#
-# NOTE: D# key is "'" (apostrophe). If your game shows a different key there,
-# change LOW[3] to match.
-
-LOW = {
-    0: 'l',   # C
-    1: '.',   # C#
-    2: ';',   # D
-    3: "'",   # D#
-    4: '/',   # E
-    5: 'o',   # F
-    6: '0',   # F#
-    7: 'p',   # G
-    8: '-',   # G#
-    9: '[',   # A
-    10: '=',  # A#
-    11: ']',  # B
-}
-
-MID = {
-    0: 'z',  1: 's',  2: 'x',  3: 'd',  4: 'c',  5: 'v',
-    6: 'g',  7: 'b',  8: 'h',  9: 'n', 10: 'j', 11: 'm',
-}
-
-HIGH = {
-    0: 'q',  1: '2',  2: 'w',  3: '3',  4: 'e',  5: 'r',
-    6: '5',  7: 't',  8: '6',  9: 'y', 10: '7', 11: 'u',
-}
-
-HIGH_PLUS_C = 'i'  # extra top C only
-
 
 APP_DIR = Path.cwd()
 MIDIS_DIR = APP_DIR / "midis"
 CONFIG_FILE = APP_DIR / "presets.json"
+
+
+# ===========================
+# Keymaps
+# ===========================
+# Semitone indices: 0..11 = C, C#, D, D#, E, F, F#, G, G#, A, A#, B
+#
+# Mac/PlayCover (your first image):
+#   HIGH: q 2 w 3 e r 5 t 6 y 7 u + (extra top C) i
+#   MID : z s x d c v g b h n j m
+#   LOW : , l . ; / o 0 p - [ = ]
+#
+# Windows (your second image):
+#   HIGH: q 2 w 3 e r 5 t 6 y 7 u + (extra top C) i
+#   MID : z s x d c v g b h n j m
+#   LOW : l . ; ' / o 0 p - [ = ]
+#
+# Note: Windows LOW D# is apostrophe "'".
+
+
+def get_keymaps(use_windows: bool):
+    # top row (same for both)
+    HIGH = {
+        0: 'q',  1: '2',  2: 'w',  3: '3',  4: 'e',  5: 'r',
+        6: '5',  7: 't',  8: '6',  9: 'y', 10: '7', 11: 'u',
+    }
+    HIGH_PLUS_C = 'i'  # extra top C
+
+    # middle row (same for both)
+    MID = {
+        0: 'z',  1: 's',  2: 'x',  3: 'd',  4: 'c',  5: 'v',
+        6: 'g',  7: 'b',  8: 'h',  9: 'n', 10: 'j', 11: 'm',
+    }
+
+    if use_windows:
+        # Windows low row (from your Windows screenshot)
+        LOW = {
+            0: 'l',   # C
+            1: '.',   # C#
+            2: ';',   # D
+            3: "'",   # D#
+            4: '/',   # E
+            5: 'o',   # F
+            6: '0',   # F#
+            7: 'p',   # G
+            8: '-',   # G#
+            9: '[',   # A
+            10: '=',  # A#
+            11: ']',  # B
+        }
+    else:
+        # Mac/PlayCover low row (from your Mac screenshot)
+        LOW = {
+            0: ',',  1: 'l',  2: '.',  3: ';',  4: '/',  5: 'o',
+            6: '0',  7: 'p',  8: '-',  9: '[', 10: '=', 11: ']',
+        }
+
+    return LOW, MID, HIGH, HIGH_PLUS_C
 
 
 @dataclass
@@ -88,13 +88,15 @@ class Config:
     trim_silence: bool = True
 
     tap_mode: bool = True
-    tap_ms: int = 18  # typical stable range: 8–30ms
+    tap_ms: int = 18
 
-    use_directinput: bool = False  # Windows-only helper
+    use_windows_map: bool = False  # checkbox toggle
 
 
 def midi_note_to_key(note: int, cfg: Config) -> Optional[str]:
     """Convert MIDI note to a mapped keyboard key, or None if out of range."""
+    LOW, MID, HIGH, HIGH_PLUS_C = get_keymaps(cfg.use_windows_map)
+
     note += cfg.transpose
     d = note - cfg.base_c_midi
     if d < 0:
@@ -117,7 +119,7 @@ def midi_note_to_key(note: int, cfg: Config) -> Optional[str]:
 def collect_abs_timed_messages(midi_path: str) -> List[Tuple[float, mido.Message]]:
     """
     Return list of (abs_time_seconds, msg) in playback order.
-    Iterating MidiFile yields messages where msg.time is seconds since previous message. :contentReference[oaicite:5]{index=5}
+    When iterating a MidiFile, msg.time is seconds since previous message. :contentReference[oaicite:4]{index=4}
     """
     mid = mido.MidiFile(midi_path)
     out: List[Tuple[float, mido.Message]] = []
@@ -160,7 +162,7 @@ def find_trim_window(timed: List[Tuple[float, mido.Message]]) -> Tuple[float, fl
 
 
 def group_by_time(timed: List[Tuple[float, mido.Message]], eps: float = 1e-9):
-    """Yield (t, [msgs]) grouped by identical (or near-identical) timestamps."""
+    """Yield (t, [msgs]) grouped by identical timestamps (for chord taps)."""
     if not timed:
         return
     i = 0
@@ -178,8 +180,8 @@ def group_by_time(timed: List[Tuple[float, mido.Message]], eps: float = 1e-9):
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("MIDI → Sky Piano (Windows Keymap)")
-        self.geometry("940x680")
+        self.title("MIDI → Sky Piano (Mac/Windows Keymap Toggle)")
+        self.geometry("940x700")
 
         self.cfg = Config()
         self._stop_event = threading.Event()
@@ -189,8 +191,9 @@ class App(tk.Tk):
 
         self._build_ui()
         self._refresh_presets_dropdown()
+        self._update_test_button_text()
 
-    # ---------------- storage helpers ----------------
+    # ---------- storage ----------
     def _ensure_dirs(self):
         APP_DIR.mkdir(parents=True, exist_ok=True)
         MIDIS_DIR.mkdir(parents=True, exist_ok=True)
@@ -210,10 +213,10 @@ class App(tk.Tk):
         if not src_path.exists():
             raise FileNotFoundError(src_path)
         dest = self._unique_dest(MIDIS_DIR / src_path.name)
-        shutil.copy2(src_path, dest)  # copy into storage so presets won't break :contentReference[oaicite:6]{index=6}
+        shutil.copy2(src_path, dest)  # copy into storage :contentReference[oaicite:5]{index=5}
         return dest
 
-    # ---------------- presets (JSON) ----------------
+    # ---------- presets ----------
     def _load_presets(self) -> Dict[str, Dict[str, Any]]:
         try:
             if CONFIG_FILE.exists():
@@ -238,7 +241,6 @@ class App(tk.Tk):
             self.apply_preset()
 
     def save_preset(self) -> None:
-        """Save preset (overwrite if same name)."""
         name = self.preset_name_var.get().strip()
         if not name:
             messagebox.showerror("Missing name", "Type a preset name first.")
@@ -261,7 +263,7 @@ class App(tk.Tk):
             )
             return
 
-        existed = name in self.presets
+        existed = name in self.presets  # overwrite if same name
 
         self.presets[name] = {
             "midi_relpath": str(stored_rel),
@@ -272,7 +274,7 @@ class App(tk.Tk):
             "trim_silence": bool(self.trim_silence.get()),
             "tap_mode": bool(self.tap_mode.get()),
             "tap_ms": int(self.tap_ms.get()),
-            "use_directinput": bool(self.use_directinput.get()),
+            "use_windows_map": bool(self.use_windows_map.get()),
         }
 
         self._save_presets()
@@ -281,7 +283,7 @@ class App(tk.Tk):
         self._log(f"{'Overwrote' if existed else 'Saved'} preset '{name}' (MIDI + settings).")
 
     def apply_preset(self, _event=None) -> None:
-        """Auto-called when selecting dropdown (no Apply button)."""
+        """Auto-called when selecting dropdown (no Apply button). :contentReference[oaicite:6]{index=6}"""
         name = self.preset_var.get().strip()
         if not name:
             return
@@ -289,6 +291,7 @@ class App(tk.Tk):
         if not isinstance(preset, dict):
             return
 
+        # Stop if playing
         if self._play_thread and self._play_thread.is_alive():
             self._stop_event.set()
             self._log("Stopping playback to switch preset…")
@@ -300,10 +303,11 @@ class App(tk.Tk):
         self.trim_silence.set(bool(preset.get("trim_silence", True)))
         self.tap_mode.set(bool(preset.get("tap_mode", True)))
         self.tap_ms.set(int(preset.get("tap_ms", 18)))
-        self.use_directinput.set(bool(preset.get("use_directinput", False)))
+        self.use_windows_map.set(bool(preset.get("use_windows_map", False)))
         self._update_tap_ui_state()
-        self._update_directinput_ui_state()
+        self._update_test_button_text()
 
+        # Load MIDI from storage
         rel = preset.get("midi_relpath", "")
         midi_path = (APP_DIR / rel).resolve() if rel else None
         if not midi_path or not midi_path.exists():
@@ -316,23 +320,11 @@ class App(tk.Tk):
         self.cfg.midi_path = str(midi_path)
         self.file_label.config(text=midi_path.name)
         self.play_btn.config(state="normal")
+
         self.preset_name_var.set(name)
         self._log(f"Loaded preset '{name}' → {midi_path.name}")
 
-    # ---------------- input backend ----------------
-    def _send_press(self, k: str):
-        if self.cfg.use_directinput and HAS_PYDIRECTINPUT:
-            pydirectinput.keyDown(k)
-        else:
-            kb.press(k)
-
-    def _send_release(self, k: str):
-        if self.cfg.use_directinput and HAS_PYDIRECTINPUT:
-            pydirectinput.keyUp(k)
-        else:
-            kb.release(k)
-
-    # ---------------- UI helpers ----------------
+    # ---------- UI helpers ----------
     def _ui(self, fn):
         self.after(0, fn)
 
@@ -356,24 +348,15 @@ class App(tk.Tk):
         except Exception:
             pass
 
-    def _update_directinput_ui_state(self):
-        if not HAS_PYDIRECTINPUT:
-            self.use_directinput.set(False)
-            try:
-                self.directinfo_label.config(
-                    text="DirectInput: pydirectinput not installed (optional).",
-                )
-            except Exception:
-                pass
-        else:
-            try:
-                self.directinfo_label.config(
-                    text="DirectInput available (helps if game ignores normal keys).",
-                )
-            except Exception:
-                pass
+    def _update_test_button_text(self):
+        # Show what key is LOW C for the selected map
+        tmp = Config(use_windows_map=bool(self.use_windows_map.get()))
+        low_c_key = midi_note_to_key(tmp.base_c_midi, tmp)  # base C itself
+        low_c_key = low_c_key if low_c_key else "?"
+        mode = "Windows" if self.use_windows_map.get() else "Mac/PlayCover"
+        self.test_btn.configure(text=f"Test LOW C ({mode}) = '{low_c_key}'")
 
-    # ---------------- UI ----------------
+    # ---------- UI ----------
     def _build_ui(self):
         frm = tk.Frame(self, padx=12, pady=12)
         frm.pack(fill="both", expand=True)
@@ -406,9 +389,7 @@ class App(tk.Tk):
         self.preset_var = tk.StringVar(value="")
         self.preset_combo = ttk.Combobox(r2, textvariable=self.preset_var, state="readonly")
         self.preset_combo.pack(side="left", fill="x", expand=True)
-
-        # Auto-apply on selection (this is the intended Tk behavior). :contentReference[oaicite:7]{index=7}
-        self.preset_combo.bind("<<ComboboxSelected>>", self.apply_preset)
+        self.preset_combo.bind("<<ComboboxSelected>>", self.apply_preset)  # :contentReference[oaicite:7]{index=7}
 
         # Settings
         settings = tk.LabelFrame(frm, text="Playback settings", padx=10, pady=10)
@@ -423,7 +404,8 @@ class App(tk.Tk):
         self.tap_mode = tk.BooleanVar(value=True)
         self.tap_ms = tk.IntVar(value=18)
 
-        self.use_directinput = tk.BooleanVar(value=False)
+        # Keymap toggle checkbox
+        self.use_windows_map = tk.BooleanVar(value=False)  # BooleanVar is standard for checkboxes :contentReference[oaicite:8]{index=8}
 
         self._slider(settings, "Base C MIDI (octave align)", self.base_c, 24, 84, 1)
         self._slider(settings, "Transpose (semitones)", self.transpose, -24, 24, 1)
@@ -452,16 +434,14 @@ class App(tk.Tk):
         tk.Label(tap_row, textvariable=self.tap_ms, width=10, anchor="e").pack(side="right")
         self._update_tap_ui_state()
 
-        di_row = tk.Frame(settings)
-        di_row.pack(fill="x", pady=(8, 0))
+        map_row = tk.Frame(settings)
+        map_row.pack(fill="x", pady=(10, 0))
         tk.Checkbutton(
-            di_row,
-            text="Use DirectInput (Windows) if game ignores key presses",
-            variable=self.use_directinput,
+            map_row,
+            text="Use Windows keymap (black keys: 2 3 5 6 7 / S D G H J / . ' 0 - =)",
+            variable=self.use_windows_map,
+            command=self._update_test_button_text
         ).pack(side="left")
-        self.directinfo_label = tk.Label(di_row, text="")
-        self.directinfo_label.pack(side="left", padx=(10, 0))
-        self._update_directinput_ui_state()
 
         # Buttons
         btns = tk.Frame(frm)
@@ -473,7 +453,8 @@ class App(tk.Tk):
         self.stop_btn = tk.Button(btns, text="■ Stop", command=self.stop, state="disabled")
         self.stop_btn.pack(side="left", padx=(8, 0))
 
-        tk.Button(btns, text="Test note (low C = 'L')", command=self.test_note).pack(side="right")
+        self.test_btn = tk.Button(btns, text="Test LOW C", command=self.test_note)
+        self.test_btn.pack(side="right")
 
         # Log
         log_frame = tk.LabelFrame(frm, text="Log", padx=10, pady=10)
@@ -482,11 +463,11 @@ class App(tk.Tk):
         self.log = tk.Text(log_frame, height=12, wrap="word")
         self.log.pack(fill="both", expand=True)
 
-        self._log("Tip: Click the game window before playback so keystrokes go to the game.")
-        self._log("MIDI timing uses msg.time in seconds between messages when iterating MidiFile. :contentReference[oaicite:8]{index=8}")
+        self._log("Choose MIDI… copies it into app storage so presets never break if you move/delete originals.")
         self._log("If notes blend into a long click: enable Tap mode and try 12–25ms.")
+        self._log("Tip: click the game window during Lead-in so it receives keys.")
 
-    # ---------------- actions ----------------
+    # ---------- actions ----------
     def choose_midi(self):
         path = filedialog.askopenfilename(
             title="Select MIDI file",
@@ -507,11 +488,20 @@ class App(tk.Tk):
         self._log(f"Imported MIDI into storage: {stored.name}")
 
     def test_note(self):
-        # low C is 'l' in our mapping
-        self._send_press('l')
+        # Press and release the LOW C key according to current keymap
+        tmp_cfg = Config(
+            base_c_midi=int(self.base_c.get()),
+            transpose=int(self.transpose.get()),
+            use_windows_map=bool(self.use_windows_map.get()),
+        )
+        k = midi_note_to_key(tmp_cfg.base_c_midi, tmp_cfg)
+        if not k:
+            self._log("Test note failed: LOW C not mapped (check Base C MIDI).")
+            return
+        kb.press(k)
         time.sleep(0.05)
-        self._send_release('l')
-        self._log("Sent test key 'L' (low C). If octave is wrong, adjust Base C MIDI.")
+        kb.release(k)
+        self._log(f"Sent test LOW C key '{k}'")
 
     def play(self):
         if not self.cfg.midi_path:
@@ -526,14 +516,7 @@ class App(tk.Tk):
         self.cfg.trim_silence = bool(self.trim_silence.get())
         self.cfg.tap_mode = bool(self.tap_mode.get())
         self.cfg.tap_ms = int(self.tap_ms.get())
-        self.cfg.use_directinput = bool(self.use_directinput.get())
-
-        if self.cfg.use_directinput and not HAS_PYDIRECTINPUT:
-            messagebox.showwarning(
-                "DirectInput not available",
-                "pydirectinput is not installed.\nRun: pip install pydirectinput\n(or turn off DirectInput)"
-            )
-            self.cfg.use_directinput = False
+        self.cfg.use_windows_map = bool(self.use_windows_map.get())
 
         # Stop any existing playback
         if self._play_thread and self._play_thread.is_alive():
@@ -568,6 +551,7 @@ class App(tk.Tk):
                 start_t, end_t = find_trim_window(timed)
                 timed = [(t, msg) for (t, msg) in timed if start_t <= t <= end_t]
                 self._ui(lambda: self._log(f"Trim: start={start_t:.3f}s end={end_t:.3f}s"))
+
             if not timed:
                 self._ui(lambda: self._log("No messages to play (empty after trim)."))
                 return
@@ -586,8 +570,8 @@ class App(tk.Tk):
                 prev_t = t
 
                 if self.cfg.tap_mode:
-                    # Tap mode: press all keys at this timestamp, then release together.
-                    keys = []
+                    # Tap mode: press all keys at this timestamp, then release together
+                    keys: List[str] = []
                     for msg in msgs:
                         if msg.is_meta:
                             continue
@@ -601,12 +585,11 @@ class App(tk.Tk):
                     keys = [k for k in keys if not (k in seen or seen.add(k))]
 
                     for k in keys:
-                        self._send_press(k)
+                        kb.press(k)
                     if keys:
                         time.sleep(tap_seconds)
                         for k in keys:
-                            self._send_release(k)
-
+                            kb.release(k)
                 else:
                     # Hold mode: press on note_on, release on note_off (or note_on vel=0)
                     for msg in msgs:
@@ -615,11 +598,11 @@ class App(tk.Tk):
                         if msg.type == "note_on" and getattr(msg, "velocity", 0) > 0:
                             k = midi_note_to_key(msg.note, self.cfg)
                             if k is not None:
-                                self._send_press(k)
+                                kb.press(k)
                         elif msg.type == "note_off" or (msg.type == "note_on" and getattr(msg, "velocity", 0) == 0):
                             k = midi_note_to_key(msg.note, self.cfg)
                             if k is not None:
-                                self._send_release(k)
+                                kb.release(k)
 
             self._ui(lambda: self._log("Stopped." if self._stop_event.is_set() else "Done."))
 
