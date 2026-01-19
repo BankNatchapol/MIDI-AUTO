@@ -19,41 +19,53 @@ APP_DIR = Path.cwd()
 MIDIS_DIR = APP_DIR / "midis"
 CONFIG_FILE = APP_DIR / "presets.json"
 
+# =========================================================
+# 15-key layout (YOUR PROVIDED ORDER)
+# =========================================================
+# q w e r t y u i
+# a s d f g h j
+KEYS_15 = [
+    'a',  # 0
+    's',  # 1
+    'd',  # 2
+    'f',  # 3
+    'g',  # 4
+    'h',  # 5
+    'j',  # 6
+    'q',  # 7
+    'w',  # 8
+    'e',  # 9
+    'r',  # 10
+    't',  # 11
+    'y',  # 12
+    'u',  # 13
+    'i',  # 14
+]
+
+
+# Diatonic semitones within an octave for Do..Si in C major: C D E F G A B
+DIATONIC_SEMITONES = [0, 2, 4, 5, 7, 9, 11]
+SEMITONE_TO_DEGREE = {s: i for i, s in enumerate(DIATONIC_SEMITONES)}
+
 
 # ===========================
-# Keymaps
+# 21-key keymaps (with black)
 # ===========================
-# Semitone indices: 0..11 = C, C#, D, D#, E, F, F#, G, G#, A, A#, B
-#
-# Mac/PlayCover (your first image):
-#   HIGH: q 2 w 3 e r 5 t 6 y 7 u + (extra top C) i
-#   MID : z s x d c v g b h n j m
-#   LOW : , l . ; / o 0 p - [ = ]
-#
-# Windows (your second image):
-#   HIGH: q 2 w 3 e r 5 t 6 y 7 u + (extra top C) i
-#   MID : z s x d c v g b h n j m
-#   LOW : l . ; ' / o 0 p - [ = ]
-#
-# Note: Windows LOW D# is apostrophe "'".
-
-
 def get_keymaps(use_windows: bool):
-    # top row (same for both)
+    # top row
     HIGH = {
         0: 'q',  1: '2',  2: 'w',  3: '3',  4: 'e',  5: 'r',
         6: '5',  7: 't',  8: '6',  9: 'y', 10: '7', 11: 'u',
     }
-    HIGH_PLUS_C = 'i'  # extra top C
+    HIGH_PLUS_C = 'i'
 
-    # middle row (same for both)
+    # middle row
     MID = {
         0: 'z',  1: 's',  2: 'x',  3: 'd',  4: 'c',  5: 'v',
         6: 'g',  7: 'b',  8: 'h',  9: 'n', 10: 'j', 11: 'm',
     }
 
     if use_windows:
-        # Windows low row (from your Windows screenshot)
         LOW = {
             0: 'l',   # C
             1: '.',   # C#
@@ -69,7 +81,6 @@ def get_keymaps(use_windows: bool):
             11: ']',  # B
         }
     else:
-        # Mac/PlayCover low row (from your Mac screenshot)
         LOW = {
             0: ',',  1: 'l',  2: '.',  3: ';',  4: '/',  5: 'o',
             6: '0',  7: 'p',  8: '-',  9: '[', 10: '=', 11: ']',
@@ -87,24 +98,81 @@ class Config:
     lead_in: float = 2.0
     trim_silence: bool = True
 
-    tap_mode: bool = True
+    always_tap: bool = True
     tap_ms: int = 18
 
-    use_windows_map: bool = False  # checkbox toggle
+    use_windows_map: bool = False
+    use_15_keys: bool = False
+
+    # 15-key submode:
+    # False = diatonic-only (white notes)
+    # True  = chromatic (include half steps)
+    chromatic_15: bool = True
+
+    # squeeze feature (15-key only; default OFF)
+    squeeze_enabled: bool = False
+    squeeze_lo: int = 3
+    squeeze_hi: int = 11
+
+
+def clamp_int(x: int, lo: int, hi: int) -> int:
+    return lo if x < lo else hi if x > hi else x
+
+
+def squeeze_index(idx_0_14: int, lo: int, hi: int) -> int:
+    """Map 0..14 into lo..hi monotonically."""
+    idx = clamp_int(idx_0_14, 0, 14)
+    lo = clamp_int(lo, 0, 14)
+    hi = clamp_int(hi, 0, 14)
+    if lo > hi:
+        lo, hi = hi, lo
+    if lo == hi:
+        return lo
+    return clamp_int(lo + round(idx * (hi - lo) / 14.0), lo, hi)
+
+
+def _quantize_to_white_floor(semitone: int) -> int:
+    """Diatonic-only: map black notes down to nearest lower white note."""
+    if semitone in SEMITONE_TO_DEGREE:
+        return semitone
+    for s in reversed(DIATONIC_SEMITONES):
+        if s <= semitone:
+            return s
+    return 0
 
 
 def midi_note_to_key(note: int, cfg: Config) -> Optional[str]:
-    """Convert MIDI note to a mapped keyboard key, or None if out of range."""
-    LOW, MID, HIGH, HIGH_PLUS_C = get_keymaps(cfg.use_windows_map)
-
     note += cfg.transpose
     d = note - cfg.base_c_midi
     if d < 0:
         return None
 
+    if cfg.use_15_keys:
+        # ---------- 15-key chromatic (includes half-steps) ----------
+        if cfg.chromatic_15:
+            idx = d  # 1 MIDI note step = 1 semitone
+            if not (0 <= idx < 15):
+                return None
+            if cfg.squeeze_enabled:
+                idx = squeeze_index(idx, cfg.squeeze_lo, cfg.squeeze_hi)
+            return KEYS_15[idx]
+
+        # ---------- 15-key diatonic-only (white notes) ----------
+        octave = d // 12
+        semitone = d % 12
+        semitone = _quantize_to_white_floor(semitone)
+        degree = SEMITONE_TO_DEGREE[semitone]  # 0..6
+        idx = octave * 7 + degree
+        if not (0 <= idx < 15):
+            return None
+        if cfg.squeeze_enabled:
+            idx = squeeze_index(idx, cfg.squeeze_lo, cfg.squeeze_hi)
+        return KEYS_15[idx]
+
+    # ---------- 21-key mode ----------
+    LOW, MID, HIGH, HIGH_PLUS_C = get_keymaps(cfg.use_windows_map)
     octave = d // 12
     semitone = d % 12
-
     if octave == 0:
         return LOW.get(semitone)
     if octave == 1:
@@ -117,10 +185,7 @@ def midi_note_to_key(note: int, cfg: Config) -> Optional[str]:
 
 
 def collect_abs_timed_messages(midi_path: str) -> List[Tuple[float, mido.Message]]:
-    """
-    Return list of (abs_time_seconds, msg) in playback order.
-    When iterating a MidiFile, msg.time is seconds since previous message. :contentReference[oaicite:4]{index=4}
-    """
+    """Iterating MidiFile gives playback order; msg.time is seconds since previous."""
     mid = mido.MidiFile(midi_path)
     out: List[Tuple[float, mido.Message]] = []
     t = 0.0
@@ -131,7 +196,6 @@ def collect_abs_timed_messages(midi_path: str) -> List[Tuple[float, mido.Message
 
 
 def find_trim_window(timed: List[Tuple[float, mido.Message]]) -> Tuple[float, float]:
-    """Trim window [start, end] based on first note_on and last note event."""
     if not timed:
         return 0.0, 0.0
 
@@ -145,10 +209,7 @@ def find_trim_window(timed: List[Tuple[float, mido.Message]]) -> Tuple[float, fl
             break
 
     for t, msg in reversed(timed):
-        if msg.type == "note_off":
-            end = t
-            break
-        if msg.type == "note_on":
+        if msg.type in ("note_off", "note_on"):
             end = t
             break
 
@@ -162,7 +223,6 @@ def find_trim_window(timed: List[Tuple[float, mido.Message]]) -> Tuple[float, fl
 
 
 def group_by_time(timed: List[Tuple[float, mido.Message]], eps: float = 1e-9):
-    """Yield (t, [msgs]) grouped by identical timestamps (for chord taps)."""
     if not timed:
         return
     i = 0
@@ -180,8 +240,8 @@ def group_by_time(timed: List[Tuple[float, mido.Message]], eps: float = 1e-9):
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("MIDI → Sky Piano (Mac/Windows Keymap Toggle)")
-        self.geometry("940x700")
+        self.title("MIDI → Piano Game (21-key / 15-key + chromatic + squeeze)")
+        self.geometry("1080x860")
 
         self.cfg = Config()
         self._stop_event = threading.Event()
@@ -191,6 +251,7 @@ class App(tk.Tk):
 
         self._build_ui()
         self._refresh_presets_dropdown()
+        self._update_ui_states()
         self._update_test_button_text()
 
     # ---------- storage ----------
@@ -210,10 +271,8 @@ class App(tk.Tk):
 
     def _import_midi_to_storage(self, src_path: Path) -> Path:
         self._ensure_dirs()
-        if not src_path.exists():
-            raise FileNotFoundError(src_path)
         dest = self._unique_dest(MIDIS_DIR / src_path.name)
-        shutil.copy2(src_path, dest)  # copy into storage :contentReference[oaicite:5]{index=5}
+        shutil.copy2(src_path, dest)
         return dest
 
     # ---------- presets ----------
@@ -246,7 +305,7 @@ class App(tk.Tk):
             messagebox.showerror("Missing name", "Type a preset name first.")
             return
         if not self.cfg.midi_path:
-            messagebox.showerror("No MIDI", "Choose MIDI… first (it imports into storage).")
+            messagebox.showerror("No MIDI", "Choose MIDI… first.")
             return
 
         stored_path = Path(self.cfg.midi_path)
@@ -259,11 +318,17 @@ class App(tk.Tk):
         except ValueError:
             messagebox.showerror(
                 "MIDI not imported",
-                "This MIDI isn't in app storage.\nUse Choose MIDI… (copies into storage), then save again."
+                "This MIDI isn't in app storage.\nUse Choose MIDI… (it copies into storage), then save again."
             )
             return
 
-        existed = name in self.presets  # overwrite if same name
+        existed = name in self.presets
+
+        # sanitize squeeze bounds
+        lo = clamp_int(int(self.squeeze_lo.get()), 0, 14)
+        hi = clamp_int(int(self.squeeze_hi.get()), 0, 14)
+        if lo > hi:
+            lo, hi = hi, lo
 
         self.presets[name] = {
             "midi_relpath": str(stored_rel),
@@ -272,18 +337,22 @@ class App(tk.Tk):
             "speed": float(self.speed.get()),
             "lead_in": float(self.lead_in.get()),
             "trim_silence": bool(self.trim_silence.get()),
-            "tap_mode": bool(self.tap_mode.get()),
+            "always_tap": bool(self.always_tap.get()),
             "tap_ms": int(self.tap_ms.get()),
             "use_windows_map": bool(self.use_windows_map.get()),
+            "use_15_keys": bool(self.use_15_keys.get()),
+            "chromatic_15": bool(self.chromatic_15.get()),
+            "squeeze_enabled": bool(self.squeeze_enabled.get()),
+            "squeeze_lo": lo,
+            "squeeze_hi": hi,
         }
 
         self._save_presets()
         self._refresh_presets_dropdown()
         self.preset_var.set(name)
-        self._log(f"{'Overwrote' if existed else 'Saved'} preset '{name}' (MIDI + settings).")
+        self._log(f"{'Overwrote' if existed else 'Saved'} preset '{name}'.")
 
     def apply_preset(self, _event=None) -> None:
-        """Auto-called when selecting dropdown (no Apply button). :contentReference[oaicite:6]{index=6}"""
         name = self.preset_var.get().strip()
         if not name:
             return
@@ -291,7 +360,6 @@ class App(tk.Tk):
         if not isinstance(preset, dict):
             return
 
-        # Stop if playing
         if self._play_thread and self._play_thread.is_alive():
             self._stop_event.set()
             self._log("Stopping playback to switch preset…")
@@ -301,13 +369,19 @@ class App(tk.Tk):
         self.speed.set(float(preset.get("speed", 1.0)))
         self.lead_in.set(float(preset.get("lead_in", 2.0)))
         self.trim_silence.set(bool(preset.get("trim_silence", True)))
-        self.tap_mode.set(bool(preset.get("tap_mode", True)))
+        self.always_tap.set(bool(preset.get("always_tap", True)))
         self.tap_ms.set(int(preset.get("tap_ms", 18)))
         self.use_windows_map.set(bool(preset.get("use_windows_map", False)))
-        self._update_tap_ui_state()
+        self.use_15_keys.set(bool(preset.get("use_15_keys", False)))
+        self.chromatic_15.set(bool(preset.get("chromatic_15", True)))
+
+        self.squeeze_enabled.set(bool(preset.get("squeeze_enabled", False)))
+        self.squeeze_lo.set(int(preset.get("squeeze_lo", 3)))
+        self.squeeze_hi.set(int(preset.get("squeeze_hi", 11)))
+
+        self._update_ui_states()
         self._update_test_button_text()
 
-        # Load MIDI from storage
         rel = preset.get("midi_relpath", "")
         midi_path = (APP_DIR / rel).resolve() if rel else None
         if not midi_path or not midi_path.exists():
@@ -320,7 +394,6 @@ class App(tk.Tk):
         self.cfg.midi_path = str(midi_path)
         self.file_label.config(text=midi_path.name)
         self.play_btn.config(state="normal")
-
         self.preset_name_var.set(name)
         self._log(f"Loaded preset '{name}' → {midi_path.name}")
 
@@ -335,26 +408,48 @@ class App(tk.Tk):
     def _slider(self, parent, label, var, a, b, step):
         row = tk.Frame(parent)
         row.pack(fill="x", pady=4)
-        tk.Label(row, text=label, width=34, anchor="w").pack(side="left")
+        tk.Label(row, text=label, width=42, anchor="w").pack(side="left")
         tk.Scale(row, variable=var, from_=a, to=b, orient="horizontal", resolution=step).pack(
             side="left", fill="x", expand=True
         )
         tk.Label(row, textvariable=var, width=10, anchor="e").pack(side="right")
 
-    def _update_tap_ui_state(self):
-        state = "normal" if self.tap_mode.get() else "disabled"
-        try:
-            self.tap_scale.configure(state=state)
-        except Exception:
-            pass
+    def _update_ui_states(self):
+        self.tap_scale.configure(state=("normal" if self.always_tap.get() else "disabled"))
+
+        # 21-key windows map only relevant when NOT 15-key
+        self.winmap_chk.configure(state=("disabled" if self.use_15_keys.get() else "normal"))
+
+        # 15-key suboptions
+        fifteen = self.use_15_keys.get()
+        self.chromatic_chk.configure(state=("normal" if fifteen else "disabled"))
+
+        # squeeze controls only when 15-key + squeeze enabled
+        self.squeeze_chk.configure(state=("normal" if fifteen else "disabled"))
+        squeeze_on = fifteen and self.squeeze_enabled.get()
+        state = "normal" if squeeze_on else "disabled"
+        self.squeeze_lo_spin.configure(state=state)
+        self.squeeze_hi_spin.configure(state=state)
 
     def _update_test_button_text(self):
-        # Show what key is LOW C for the selected map
-        tmp = Config(use_windows_map=bool(self.use_windows_map.get()))
-        low_c_key = midi_note_to_key(tmp.base_c_midi, tmp)  # base C itself
-        low_c_key = low_c_key if low_c_key else "?"
-        mode = "Windows" if self.use_windows_map.get() else "Mac/PlayCover"
-        self.test_btn.configure(text=f"Test LOW C ({mode}) = '{low_c_key}'")
+        tmp_cfg = Config(
+            base_c_midi=int(self.base_c.get()),
+            transpose=int(self.transpose.get()),
+            use_windows_map=bool(self.use_windows_map.get()),
+            use_15_keys=bool(self.use_15_keys.get()),
+            chromatic_15=bool(self.chromatic_15.get()),
+            squeeze_enabled=bool(self.squeeze_enabled.get()),
+            squeeze_lo=int(self.squeeze_lo.get()),
+            squeeze_hi=int(self.squeeze_hi.get()),
+        )
+        k = midi_note_to_key(tmp_cfg.base_c_midi, tmp_cfg) or "?"
+        if self.use_15_keys.get():
+            mode = "15-key chromatic" if self.chromatic_15.get() else "15-key diatonic"
+            if self.squeeze_enabled.get():
+                mode += " + squeeze"
+        else:
+            mode = "21-key Windows" if self.use_windows_map.get() else "21-key Mac"
+        self.test_btn.configure(text=f"Test Base C ({mode}) → '{k}'")
 
     # ---------- UI ----------
     def _build_ui(self):
@@ -364,10 +459,8 @@ class App(tk.Tk):
         # MIDI row
         file_row = tk.Frame(frm)
         file_row.pack(fill="x", pady=(0, 10))
-
         self.file_label = tk.Label(file_row, text="No MIDI selected", anchor="w")
         self.file_label.pack(side="left", fill="x", expand=True)
-
         tk.Button(file_row, text="Choose MIDI…", command=self.choose_midi).pack(side="right")
 
         # Presets
@@ -376,7 +469,6 @@ class App(tk.Tk):
 
         r1 = tk.Frame(box)
         r1.pack(fill="x", pady=(0, 6))
-
         tk.Label(r1, text="Preset name:", width=12, anchor="w").pack(side="left")
         self.preset_name_var = tk.StringVar()
         tk.Entry(r1, textvariable=self.preset_name_var).pack(side="left", fill="x", expand=True, padx=(0, 8))
@@ -384,15 +476,14 @@ class App(tk.Tk):
 
         r2 = tk.Frame(box)
         r2.pack(fill="x")
-
         tk.Label(r2, text="Preset:", width=12, anchor="w").pack(side="left")
         self.preset_var = tk.StringVar(value="")
         self.preset_combo = ttk.Combobox(r2, textvariable=self.preset_var, state="readonly")
         self.preset_combo.pack(side="left", fill="x", expand=True)
-        self.preset_combo.bind("<<ComboboxSelected>>", self.apply_preset)  # :contentReference[oaicite:7]{index=7}
+        self.preset_combo.bind("<<ComboboxSelected>>", self.apply_preset)
 
         # Settings
-        settings = tk.LabelFrame(frm, text="Playback settings", padx=10, pady=10)
+        settings = tk.LabelFrame(frm, text="Playback + Mapping settings", padx=10, pady=10)
         settings.pack(fill="x", pady=(0, 10))
 
         self.base_c = tk.IntVar(value=self.cfg.base_c_midi)
@@ -401,47 +492,102 @@ class App(tk.Tk):
         self.lead_in = tk.DoubleVar(value=self.cfg.lead_in)
 
         self.trim_silence = tk.BooleanVar(value=True)
-        self.tap_mode = tk.BooleanVar(value=True)
+        self.always_tap = tk.BooleanVar(value=True)
         self.tap_ms = tk.IntVar(value=18)
 
-        # Keymap toggle checkbox
-        self.use_windows_map = tk.BooleanVar(value=False)  # BooleanVar is standard for checkboxes :contentReference[oaicite:8]{index=8}
+        self.use_windows_map = tk.BooleanVar(value=False)
+        self.use_15_keys = tk.BooleanVar(value=False)
+        self.chromatic_15 = tk.BooleanVar(value=True)   # IMPORTANT: default ON when using 15-key
 
-        self._slider(settings, "Base C MIDI (octave align)", self.base_c, 24, 84, 1)
+        # squeeze vars (default OFF)
+        self.squeeze_enabled = tk.BooleanVar(value=False)
+        self.squeeze_lo = tk.IntVar(value=3)
+        self.squeeze_hi = tk.IntVar(value=11)
+
+        self._slider(settings, "Base C MIDI (alignment)", self.base_c, 24, 84, 1)
         self._slider(settings, "Transpose (semitones)", self.transpose, -24, 24, 1)
         self._slider(settings, "Speed", self.speed, 0.25, 3.0, 0.05)
         self._slider(settings, "Lead-in seconds (focus game)", self.lead_in, 0.0, 10.0, 0.25)
 
-        chk_row = tk.Frame(settings)
-        chk_row.pack(fill="x", pady=(8, 0))
-        tk.Checkbutton(chk_row, text="Trim start/end silence", variable=self.trim_silence).pack(side="left")
+        rowA = tk.Frame(settings)
+        rowA.pack(fill="x", pady=(8, 0))
+        tk.Checkbutton(rowA, text="Trim start/end silence", variable=self.trim_silence).pack(side="left")
 
-        chk_row2 = tk.Frame(settings)
-        chk_row2.pack(fill="x", pady=(6, 0))
+        rowB = tk.Frame(settings)
+        rowB.pack(fill="x", pady=(6, 0))
         tk.Checkbutton(
-            chk_row2,
-            text="Tap mode (fix overlaps / retrigger every note)",
-            variable=self.tap_mode,
-            command=self._update_tap_ui_state
+            rowB,
+            text="Always tap (ignore MIDI note length)",
+            variable=self.always_tap,
+            command=self._update_ui_states
         ).pack(side="left")
 
         tap_row = tk.Frame(settings)
         tap_row.pack(fill="x", pady=(4, 0))
-        tk.Label(tap_row, text="Tap duration (ms)", width=34, anchor="w").pack(side="left")
-        self.tap_scale = tk.Scale(tap_row, variable=self.tap_ms, from_=1, to=80,
-                                  orient="horizontal", resolution=1)
+        tk.Label(tap_row, text="Tap duration (ms)", width=42, anchor="w").pack(side="left")
+        self.tap_scale = tk.Scale(tap_row, variable=self.tap_ms, from_=1, to=80, orient="horizontal", resolution=1)
         self.tap_scale.pack(side="left", fill="x", expand=True)
         tk.Label(tap_row, textvariable=self.tap_ms, width=10, anchor="e").pack(side="right")
-        self._update_tap_ui_state()
 
-        map_row = tk.Frame(settings)
-        map_row.pack(fill="x", pady=(10, 0))
+        rowC = tk.Frame(settings)
+        rowC.pack(fill="x", pady=(10, 0))
         tk.Checkbutton(
-            map_row,
-            text="Use Windows keymap (black keys: 2 3 5 6 7 / S D G H J / . ' 0 - =)",
+            rowC,
+            text="15-key mode (q w e r t y u i / a s d f g h j)",
+            variable=self.use_15_keys,
+            command=lambda: (self._update_ui_states(), self._update_test_button_text())
+        ).pack(side="left")
+
+        rowC2 = tk.Frame(settings)
+        rowC2.pack(fill="x", pady=(4, 0))
+        self.chromatic_chk = tk.Checkbutton(
+            rowC2,
+            text="15-key chromatic (include half-steps; C, C#, D -> q, w, e)",
+            variable=self.chromatic_15,
+            command=self._update_test_button_text
+        )
+        self.chromatic_chk.pack(side="left")
+
+        rowD = tk.Frame(settings)
+        rowD.pack(fill="x", pady=(6, 0))
+        self.winmap_chk = tk.Checkbutton(
+            rowD,
+            text="21-key Windows keymap (black keys: 2 3 5 6 7 / S D G H J / . ' 0 - =)",
             variable=self.use_windows_map,
             command=self._update_test_button_text
-        ).pack(side="left")
+        )
+        self.winmap_chk.pack(side="left")
+
+        # Squeeze UI
+        squeeze_box = tk.LabelFrame(settings, text="15-key squeeze (default: OFF / unsqueezed)", padx=10, pady=8)
+        squeeze_box.pack(fill="x", pady=(10, 0))
+
+        top_sq = tk.Frame(squeeze_box)
+        top_sq.pack(fill="x")
+        self.squeeze_chk = tk.Checkbutton(
+            top_sq,
+            text="Squeeze 15-key range (remap 0..14 into [lo..hi])",
+            variable=self.squeeze_enabled,
+            command=lambda: (self._update_ui_states(), self._update_test_button_text())
+        )
+        self.squeeze_chk.pack(side="left")
+
+        band = tk.Frame(squeeze_box)
+        band.pack(fill="x", pady=(6, 0))
+
+        tk.Label(band, text="lo (0..14):", width=11, anchor="w").pack(side="left")
+        self.squeeze_lo_spin = ttk.Spinbox(
+            band, from_=0, to=14, increment=1, textvariable=self.squeeze_lo, width=6,
+            command=self._update_test_button_text
+        )
+        self.squeeze_lo_spin.pack(side="left", padx=(0, 12))
+
+        tk.Label(band, text="hi (0..14):", width=11, anchor="w").pack(side="left")
+        self.squeeze_hi_spin = ttk.Spinbox(
+            band, from_=0, to=14, increment=1, textvariable=self.squeeze_hi, width=6,
+            command=self._update_test_button_text
+        )
+        self.squeeze_hi_spin.pack(side="left")
 
         # Buttons
         btns = tk.Frame(frm)
@@ -449,23 +595,20 @@ class App(tk.Tk):
 
         self.play_btn = tk.Button(btns, text="▶ Play", command=self.play, state="disabled")
         self.play_btn.pack(side="left")
-
         self.stop_btn = tk.Button(btns, text="■ Stop", command=self.stop, state="disabled")
         self.stop_btn.pack(side="left", padx=(8, 0))
-
-        self.test_btn = tk.Button(btns, text="Test LOW C", command=self.test_note)
+        self.test_btn = tk.Button(btns, text="Test Base C", command=self.test_note)
         self.test_btn.pack(side="right")
 
         # Log
         log_frame = tk.LabelFrame(frm, text="Log", padx=10, pady=10)
         log_frame.pack(fill="both", expand=True)
-
         self.log = tk.Text(log_frame, height=12, wrap="word")
         self.log.pack(fill="both", expand=True)
 
-        self._log("Choose MIDI… copies it into app storage so presets never break if you move/delete originals.")
-        self._log("If notes blend into a long click: enable Tap mode and try 12–25ms.")
-        self._log("Tip: click the game window during Lead-in so it receives keys.")
+        self._log("15-key chromatic maps semitone steps directly: C,C#,D -> q,w,e.")
+        self._log("Squeeze is OFF by default.")
+        self._log("If octave feels wrong, adjust Base C MIDI and use Test Base C.")
 
     # ---------- actions ----------
     def choose_midi(self):
@@ -475,50 +618,61 @@ class App(tk.Tk):
         )
         if not path:
             return
-
         try:
             stored = self._import_midi_to_storage(Path(path))
         except Exception as e:
             messagebox.showerror("Import failed", str(e))
             return
-
         self.cfg.midi_path = str(stored)
         self.file_label.config(text=stored.name)
         self.play_btn.config(state="normal")
         self._log(f"Imported MIDI into storage: {stored.name}")
 
     def test_note(self):
-        # Press and release the LOW C key according to current keymap
         tmp_cfg = Config(
             base_c_midi=int(self.base_c.get()),
             transpose=int(self.transpose.get()),
             use_windows_map=bool(self.use_windows_map.get()),
+            use_15_keys=bool(self.use_15_keys.get()),
+            chromatic_15=bool(self.chromatic_15.get()),
+            squeeze_enabled=bool(self.squeeze_enabled.get()),
+            squeeze_lo=int(self.squeeze_lo.get()),
+            squeeze_hi=int(self.squeeze_hi.get()),
         )
         k = midi_note_to_key(tmp_cfg.base_c_midi, tmp_cfg)
         if not k:
-            self._log("Test note failed: LOW C not mapped (check Base C MIDI).")
+            self._log("Test failed: Base C not mapped (check Base C MIDI).")
             return
         kb.press(k)
         time.sleep(0.05)
         kb.release(k)
-        self._log(f"Sent test LOW C key '{k}'")
+        self._log(f"Sent test key '{k}'")
 
     def play(self):
         if not self.cfg.midi_path:
             messagebox.showerror("No MIDI", "Choose MIDI… first.")
             return
 
-        # Snapshot settings
+        # snapshot settings
         self.cfg.base_c_midi = int(self.base_c.get())
         self.cfg.transpose = int(self.transpose.get())
         self.cfg.speed = float(self.speed.get())
         self.cfg.lead_in = float(self.lead_in.get())
         self.cfg.trim_silence = bool(self.trim_silence.get())
-        self.cfg.tap_mode = bool(self.tap_mode.get())
+        self.cfg.always_tap = bool(self.always_tap.get())
         self.cfg.tap_ms = int(self.tap_ms.get())
         self.cfg.use_windows_map = bool(self.use_windows_map.get())
+        self.cfg.use_15_keys = bool(self.use_15_keys.get())
+        self.cfg.chromatic_15 = bool(self.chromatic_15.get())
 
-        # Stop any existing playback
+        self.cfg.squeeze_enabled = bool(self.squeeze_enabled.get())
+        lo = clamp_int(int(self.squeeze_lo.get()), 0, 14)
+        hi = clamp_int(int(self.squeeze_hi.get()), 0, 14)
+        if lo > hi:
+            lo, hi = hi, lo
+        self.cfg.squeeze_lo = lo
+        self.cfg.squeeze_hi = hi
+
         if self._play_thread and self._play_thread.is_alive():
             self._stop_event.set()
             time.sleep(0.05)
@@ -526,7 +680,6 @@ class App(tk.Tk):
         self._stop_event.clear()
         self.play_btn.config(state="disabled")
         self.stop_btn.config(state="normal")
-
         self._play_thread = threading.Thread(target=self._play_worker, daemon=True)
         self._play_thread.start()
 
@@ -536,7 +689,7 @@ class App(tk.Tk):
 
     def _play_worker(self):
         try:
-            midi_path = self.cfg.midi_path  # snapshot
+            midi_path = self.cfg.midi_path
             if not Path(midi_path).exists():
                 self._ui(lambda: self._log(f"ERROR: MIDI missing: {midi_path}"))
                 return
@@ -546,7 +699,6 @@ class App(tk.Tk):
 
             timed = collect_abs_timed_messages(midi_path)
 
-            # Trim silence
             if self.cfg.trim_silence and timed:
                 start_t, end_t = find_trim_window(timed)
                 timed = [(t, msg) for (t, msg) in timed if start_t <= t <= end_t]
@@ -560,6 +712,10 @@ class App(tk.Tk):
             prev_t = groups[0][0]
             tap_seconds = max(0.001, self.cfg.tap_ms / 1000.0)
 
+            # optional hold-mode state (only if always_tap OFF)
+            key_down: Dict[str, bool] = {}
+            MIN_UP = 0.01
+
             for t, msgs in groups:
                 if self._stop_event.is_set():
                     break
@@ -569,8 +725,7 @@ class App(tk.Tk):
                     time.sleep(dt)
                 prev_t = t
 
-                if self.cfg.tap_mode:
-                    # Tap mode: press all keys at this timestamp, then release together
+                if self.cfg.always_tap:
                     keys: List[str] = []
                     for msg in msgs:
                         if msg.is_meta:
@@ -580,7 +735,7 @@ class App(tk.Tk):
                             if k is not None:
                                 keys.append(k)
 
-                    # dedupe (preserve order)
+                    # dedupe
                     seen = set()
                     keys = [k for k in keys if not (k in seen or seen.add(k))]
 
@@ -590,19 +745,34 @@ class App(tk.Tk):
                         time.sleep(tap_seconds)
                         for k in keys:
                             kb.release(k)
+
                 else:
-                    # Hold mode: press on note_on, release on note_off (or note_on vel=0)
                     for msg in msgs:
                         if msg.is_meta:
                             continue
+
                         if msg.type == "note_on" and getattr(msg, "velocity", 0) > 0:
                             k = midi_note_to_key(msg.note, self.cfg)
-                            if k is not None:
-                                kb.press(k)
+                            if k is None:
+                                continue
+                            if key_down.get(k, False):
+                                kb.release(k)
+                                time.sleep(MIN_UP)
+                                key_down[k] = False
+                            kb.press(k)
+                            key_down[k] = True
+
                         elif msg.type == "note_off" or (msg.type == "note_on" and getattr(msg, "velocity", 0) == 0):
                             k = midi_note_to_key(msg.note, self.cfg)
-                            if k is not None:
+                            if k is None:
+                                continue
+                            if key_down.get(k, False):
                                 kb.release(k)
+                                key_down[k] = False
+
+            for k, down in list(key_down.items()):
+                if down:
+                    kb.release(k)
 
             self._ui(lambda: self._log("Stopped." if self._stop_event.is_set() else "Done."))
 
@@ -611,6 +781,9 @@ class App(tk.Tk):
         finally:
             self._ui(lambda: self.play_btn.config(state=("normal" if self.cfg.midi_path else "disabled")))
             self._ui(lambda: self.stop_btn.config(state="disabled"))
+
+    def _ui(self, fn):
+        self.after(0, fn)
 
 
 if __name__ == "__main__":

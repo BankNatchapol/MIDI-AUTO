@@ -110,14 +110,85 @@
     "tap_ms": 18
   },
   "Homura - Lisa": {
-    "midi_relpath": "midis\\Homura-\u708e-Lisa.mid (1).mid",
+    "midi_relpath": "midis/Homura \"Lisa\" - [NomiHyojii].mid",
     "base_c_midi": 48,
+    "transpose": 0,
+    "speed": 1.0,
+    "lead_in": 2.0,
+    "trim_silence": true,
+    "always_tap": true,
+    "tap_ms": 18,
+    "use_windows_map": false
+  },
+  "Backlight - Ado": {
+    "midi_relpath": "midis/[\u9006\u5149] Backlight - Ado (3).mid",
+    "base_c_midi": 46,
     "transpose": 0,
     "speed": 1.0,
     "lead_in": 2.0,
     "trim_silence": true,
     "tap_mode": true,
     "tap_ms": 18,
-    "use_windows_map": true
+    "use_windows_map": false
+  },
+  "\u0e2d\u0e2d\u0e40\u0e08\u0e49\u0e32 - \u0e1e\u0e35\u0e17\u0e1e\u0e25": {
+    "midi_relpath": "midis/Eldoraudio-Keio_University_-_Shonan_Fujisawa_Campus-2.mid",
+    "base_c_midi": 48,
+    "transpose": 0,
+    "speed": 1.2,
+    "lead_in": 2.0,
+    "trim_silence": true,
+    "always_tap": true,
+    "tap_ms": 18,
+    "use_windows_map": false
+  },
+  "\u0e04\u0e39\u0e48\u0e0a\u0e35\u0e27\u0e34\u0e15 - Cocktail": {
+    "midi_relpath": "midis/Eldoraudio-_________piano.mid",
+    "base_c_midi": 48,
+    "transpose": 0,
+    "speed": 1.0,
+    "lead_in": 2.0,
+    "trim_silence": true,
+    "always_tap": true,
+    "tap_ms": 18,
+    "use_windows_map": false
+  },
+  "\u0e40\u0e18\u0e2d - Cocktail": {
+    "midi_relpath": "midis/Eldoraudio-____-_cocktail.mid",
+    "base_c_midi": 54,
+    "transpose": -1,
+    "speed": 1.0,
+    "lead_in": 2.0,
+    "trim_silence": true,
+    "always_tap": true,
+    "tap_ms": 18,
+    "use_windows_map": false
+  },
+  "Smile - Scrubb": {
+    "midi_relpath": "midis/Eldoraudio-2026-01-19_19-51-48.mid",
+    "base_c_midi": 48,
+    "transpose": 0,
+    "speed": 1.0,
+    "lead_in": 2.0,
+    "trim_silence": true,
+    "always_tap": true,
+    "tap_ms": 18,
+    "use_windows_map": false
+  },
+  "Canon in D - Violin": {
+    "midi_relpath": "midis/OEML-29185-custom (5).mid",
+    "base_c_midi": 59,
+    "transpose": -8,
+    "speed": 1.6,
+    "lead_in": 2.0,
+    "trim_silence": false,
+    "always_tap": false,
+    "tap_ms": 18,
+    "use_windows_map": false,
+    "use_15_keys": true,
+    "chromatic_15": true,
+    "squeeze_enabled": false,
+    "squeeze_lo": 3,
+    "squeeze_hi": 11
   }
 }
