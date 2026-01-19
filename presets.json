@@ -190,5 +190,21 @@
     "squeeze_enabled": false,
     "squeeze_lo": 3,
     "squeeze_hi": 11
+  },
+  "Canon in D - Piano": {
+    "midi_relpath": "midis/Eldoraudio-2026-01-19_20-55-55 (3).mid",
+    "base_c_midi": 46,
+    "transpose": 0,
+    "speed": 1.0,
+    "lead_in": 2.0,
+    "trim_silence": true,
+    "always_tap": true,
+    "tap_ms": 18,
+    "use_windows_map": false,
+    "use_15_keys": false,
+    "chromatic_15": true,
+    "squeeze_enabled": false,
+    "squeeze_lo": 3,
+    "squeeze_hi": 11
   }
 }
