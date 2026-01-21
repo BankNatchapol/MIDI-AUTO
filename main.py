@@ -11,13 +11,27 @@ from tkinter import filedialog, messagebox
 from tkinter import ttk
 
 import mido
-from Quartz.CoreGraphics import (
-    CGEventCreateKeyboardEvent,
-    CGEventPost,
-    kCGHIDEventTap
-)
 
-# macOS character-to-keycode mapping
+# ===========================
+# Cross-platform keyboard controller
+# ===========================
+# Try Quartz (macOS) first, fall back to pynput (cross-platform)
+
+try:
+    from Quartz.CoreGraphics import (
+        CGEventCreateKeyboardEvent,
+        CGEventPost,
+        kCGHIDEventTap
+    )
+    QUARTZ_AVAILABLE = True
+except ImportError:
+    QUARTZ_AVAILABLE = False
+
+if not QUARTZ_AVAILABLE:
+    from pynput.keyboard import Controller as PynputController
+
+
+# macOS character-to-keycode mapping (for Quartz)
 CHAR_TO_KEYCODE = {
     'a': 0, 's': 1, 'd': 2, 'f': 3, 'h': 4, 'g': 5, 'z': 6, 'x': 7,
     'c': 8, 'v': 9, 'b': 11, 'q': 12, 'w': 13, 'e': 14, 'r': 15,
@@ -31,8 +45,8 @@ CHAR_TO_KEYCODE = {
 }
 
 
-class KeyController:
-    """Quartz-based keyboard controller for macOS."""
+class QuartzKeyController:
+    """Quartz-based keyboard controller for macOS (low-level events)."""
 
     @staticmethod
     def press(char: str) -> None:
@@ -51,7 +65,28 @@ class KeyController:
             CGEventPost(kCGHIDEventTap, event)
 
 
-kb = KeyController()
+class PynputKeyController:
+    """Pynput-based keyboard controller for Windows/cross-platform."""
+
+    def __init__(self):
+        self._controller = PynputController()
+
+    def press(self, char: str) -> None:
+        """Press a key down."""
+        self._controller.press(char)
+
+    def release(self, char: str) -> None:
+        """Release a key."""
+        self._controller.release(char)
+
+
+# Auto-select the appropriate controller
+if QUARTZ_AVAILABLE:
+    kb = QuartzKeyController()
+    print("[Keyboard] Using Quartz (macOS native)")
+else:
+    kb = PynputKeyController()
+    print("[Keyboard] Using pynput (cross-platform)")
 
 APP_DIR = Path.cwd()
 MIDIS_DIR = APP_DIR / "midis"
