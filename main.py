@@ -11,9 +11,47 @@ from tkinter import filedialog, messagebox
 from tkinter import ttk
 
 import mido
-from pynput.keyboard import Controller
+from Quartz.CoreGraphics import (
+    CGEventCreateKeyboardEvent,
+    CGEventPost,
+    kCGHIDEventTap
+)
 
-kb = Controller()
+# macOS character-to-keycode mapping
+CHAR_TO_KEYCODE = {
+    'a': 0, 's': 1, 'd': 2, 'f': 3, 'h': 4, 'g': 5, 'z': 6, 'x': 7,
+    'c': 8, 'v': 9, 'b': 11, 'q': 12, 'w': 13, 'e': 14, 'r': 15,
+    't': 17, 'y': 16, 'u': 32, 'i': 34, 'o': 31, 'p': 35,
+    'l': 37, 'j': 38, 'k': 40, 'm': 46, 'n': 45,
+    '0': 29, '1': 18, '2': 19, '3': 20, '4': 21, '5': 23, '6': 22,
+    '7': 26, '8': 28, '9': 25,
+    '-': 27, '=': 24, '[': 33, ']': 30,
+    ';': 41, "'": 39, ',': 43, '.': 47, '/': 44,
+    '+': 24,  # same as '='
+}
+
+
+class KeyController:
+    """Quartz-based keyboard controller for macOS."""
+
+    @staticmethod
+    def press(char: str) -> None:
+        """Press a key down."""
+        code = CHAR_TO_KEYCODE.get(char)
+        if code is not None:
+            event = CGEventCreateKeyboardEvent(None, code, True)
+            CGEventPost(kCGHIDEventTap, event)
+
+    @staticmethod
+    def release(char: str) -> None:
+        """Release a key."""
+        code = CHAR_TO_KEYCODE.get(char)
+        if code is not None:
+            event = CGEventCreateKeyboardEvent(None, code, False)
+            CGEventPost(kCGHIDEventTap, event)
+
+
+kb = KeyController()
 
 APP_DIR = Path.cwd()
 MIDIS_DIR = APP_DIR / "midis"
@@ -745,7 +783,7 @@ class App(tk.Tk):
                         time.sleep(tap_seconds)
                         for k in keys:
                             kb.release(k)
-
+                    
                 else:
                     for msg in msgs:
                         if msg.is_meta:
