@@ -109,17 +109,6 @@
     "tap_mode": false,
     "tap_ms": 18
   },
-  "Homura - Lisa": {
-    "midi_relpath": "midis/Homura \"Lisa\" - [NomiHyojii].mid",
-    "base_c_midi": 48,
-    "transpose": 0,
-    "speed": 1.0,
-    "lead_in": 2.0,
-    "trim_silence": true,
-    "always_tap": true,
-    "tap_ms": 18,
-    "use_windows_map": false
-  },
   "Backlight - Ado": {
     "midi_relpath": "midis/[\u9006\u5149] Backlight - Ado (3).mid",
     "base_c_midi": 46,
@@ -240,12 +229,12 @@
     "squeeze_hi": 11
   },
   "Fairytale - Violin": {
-    "midi_relpath": "midis/Fairytale (2).mid",
-    "base_c_midi": 60,
+    "midi_relpath": "midis/Eldoraudio-YTDown.com_YouTube_Alexander-Rybak-Fairytale-EASY-Piano-Tut_Media_vcKR7gFwwUk_006_144p (8) (1).mid",
+    "base_c_midi": 58,
     "transpose": 0,
     "speed": 1.0,
-    "lead_in": 4.0,
-    "trim_silence": true,
+    "lead_in": 2.0,
+    "trim_silence": false,
     "always_tap": false,
     "tap_ms": 18,
     "use_windows_map": false,
@@ -255,13 +244,13 @@
     "squeeze_lo": 3,
     "squeeze_hi": 11
   },
-  "Fairytale - piano": {
-    "midi_relpath": "midis/Untitled.mid",
-    "base_c_midi": 48,
+  "Fairytale - Piano": {
+    "midi_relpath": "midis/Eldoraudio-YTDown.com_YouTube_Alexander-Rybak-Fairytale-EASY-Piano-Tut_Media_vcKR7gFwwUk_006_144p (7) (1).mid",
+    "base_c_midi": 38,
     "transpose": 0,
     "speed": 1.0,
-    "lead_in": 4.0,
-    "trim_silence": true,
+    "lead_in": 2.0,
+    "trim_silence": false,
     "always_tap": false,
     "tap_ms": 18,
     "use_windows_map": false,
